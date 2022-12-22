@@ -1,0 +1,51 @@
+#定义FORCE
+.PHONY:FORCE
+FORCE: ;
+
+# 如果是在外部使用Makefile，则应当使用导出的环境变量
+ifneq ($(ENVS_PRESENT),true)
+include makefile.eclipse.envs
+endif
+
+include $(ROOT_PROJECT)/makefiles/$(TARGET_ARCH)/makefile.defs
+# 添加导出的变量
+include $(ROOT_PROJECT)/makefiles/$(TARGET_ARCH)/EXPORT_TO_ALL.makefile
+include $(ROOT_PROJECT)/makefiles/$(TARGET_ARCH)/EXPORT_VARIABLES.makefile
+include $(ROOT_PROJECT)/makefiles/$(TARGET_ARCH)/EXPORT_CXX_MACROS.makefile
+include $(ROOT_PROJECT)/makefiles/$(TARGET_ARCH)/EXPORT_LINKER_SYMBOLS.makefile
+
+
+# 添加辅助依赖, 注意,USER_OBJS 只能在此进行修改，其他地方修改不会产生效果
+# 确切地说,USER_OBJS只能在makefile.defs文件中定义
+# $(OBJS) -- 由eclipse自动生成，包含所有的对象文件
+# $(USER_OBJS) -- 用户自己定义
+# makefile.defs是唯一一个在引用USER_OBJS作为依赖之前的引入的文件
+USER_OBJS += aux-check-link-script.o
+CLEAN-ALL-LIST += aux-check-link-script.o
+
+# 设置USER_CXX_FLAGS
+# DEPRECATED: -Wconversion -pie
+USER_CXX_FLAGS += -Wno-error=invalid-offsetof -Wno-unused-function -Wno-unused-label \
+-Wno-invalid-offsetof -Wno-error=comment -Wno-error=unused-label -fsigned-char -Wreorder \
+-save-temps -nostdlib -Weffc++ -Wold-style-cast -fmessage-length=0 -fmax-errors=5 \
+-ffreestanding -fno-exceptions -fno-rtti -fno-threadsafe-statics
+USER_CXX_FLAGS_qemu_virt += -march=armv8.2-a
+USER_CXX_FLAGS_zcu102 += -march=armv8.2-a 
+USER_CXX_FLAGS_user_space += -march=armv8.2-a
+USER_CXX_FLAGS_raspi3 += -march=armv8.2-a
+USER_CXX_FLAGS += $(USER_CXX_FLAGS_$(TARGET_ARCH))
+
+
+# 设置各个目标对应的linker flags
+USER_LINKER_FLAGS_COMMON += -nostdlib -Xlinker  -T$(LINKER_SCRIPT)
+USER_LINKER_FLAGS_host += 
+USER_LINKER_FLAGS_qemu_virt += 
+USER_LINKER_FLAGS_user_space += 
+USER_LINKER_FLAGS_zcu102 += 
+USER_LINKER_FLAGS +=  $(USER_LINKER_FLAGS_$(TARGET_ARCH)) $(USER_LINKER_FLAGS_COMMON) 
+
+# 设置USER_LINKER_FLAGS
+USER_LINKER_FLAGS += $(foreach sym,$(EXPORT_LINKER_SYMBOLS),-Xlinker --defsym=$(sym)=$($(sym)))
+
+
+# OBJCOPY_FLAGS += --change-warnings --adjust-warnings
